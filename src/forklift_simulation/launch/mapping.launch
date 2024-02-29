@@ -1,0 +1,5 @@
+<launch>
+    <include file="$(find forklift)/launch/forklift_control.launch" />
+    <node name="rviz" pkg="rviz" type="rviz"  args="-d $(find forklift)/config/forklift_simulation.rviz"/>
+
+</launch>

@@ -1,0 +1,41 @@
+<launch>   
+    <remap from="odom" to="/encoder" />
+    <remap from="imu_data" to="/imu" />
+    <node pkg="robot_pose_ekf" type="robot_pose_ekf" name="robot_pose_ekf">
+
+        <!-- Other parameters... -->
+        <param name="output_frame" value="odom" />
+        <param name="base_footprint_frame" value="base_footprint" />
+        <param name="freq" value="30.0" />
+        <param name="sensor_timeout" value="1.0" />
+        <param name="odom_used" value="true" />
+        <param name="imu_used" value="true" />
+        <param name="vo_used" value="false" />
+        <param name="gps_used" value="false" />
+        <param name="debug" value="false" />
+        <param name="self_diagnose" value="false" />
+
+        <!-- Use only x, y, and yaw from the odometry -->
+      
+        <param name="odom_linear_scale_correction" value="1.0 1.0 0.0"/>
+        <param name="odom_angular_scale_correction" value="0.0 0.0 1.0"/>
+  
+        <!-- Use only x/dt^2 and yaw/dt from the IMU -->
+        <param name="imu_linear_acceleration" value="true"/>
+        <param name="imu_angular_velocity" value="true"/>
+        <param name="acceleration_gains" value="1.0 0.0 0.0"/>
+        <param name="orientation_gains" value="0.0 0.0 1.0"/>
+
+        <!-- IMU Configuration -->
+        <param name="imu0" value="/imu" />
+        <param name="imu0_config" value="[0.01, 0.01, 0.01, 0.05, 0.05, 0.05]" />
+        <param name="imu0_differential" value="true" />
+
+        <!-- Encoder/Odometry Configuration -->
+        <param name="odom0" value="/encoder" />
+        <param name="odom0_config" value="[0.1, 0.1, 0.0, 0.0, 0.0, 0.1]" />
+        <param name="odom0_differential" value="false" />
+
+        
+    </node>
+</launch>
