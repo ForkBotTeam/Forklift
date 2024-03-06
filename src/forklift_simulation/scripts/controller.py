@@ -26,6 +26,7 @@ class Controller():
         self.setpointVelocity = 1.0
         self.currentVelocity = 0.0
         self.lookaheadDistance = 1.5
+        self.brakeMargin = 0.2
 
         self.L = 0.5
         self.angleLimit = 90*pi/180
@@ -118,7 +119,7 @@ class Controller():
         if self.pathReceived == True:
             update = Twist()
 
-            self.action = self.pidController()
+            self.action = self.speed_control()
             self.steering_angle = self.purePursuit()
             update.linear.x = self.action
             update.angular.z = self.steering_angle
@@ -154,7 +155,7 @@ class Controller():
         nextPoint.color.b = 0.0
         self.nextPointPub.publish(nextPoint)
       
-    def pidController(self):
+    def speed_control(self):
         
         ###            Implement PID controller here                   ###
         #          Take as an input the current state of the car         #
@@ -169,26 +170,7 @@ class Controller():
         action = self.PID(self.kp_drive, self.ki_drive, self.kd_drive, self.setpointVelocity, self.currentVelocity, clip = 1)
 
         return action
-    
-    def PID(self, kp, ki, kd, setpoint, feedback, **kwargs):
-        error = setpoint - feedback
-
-        # error_dot = (error - self.error_previous)/self.dt
-        error_integral = 0
-        error_integral += error*self.dt
-
-        self.error_previous = error
-
-        action = kp*error + ki*error_integral #+ kd*error_dot
-    
-        try:
-            if kwargs['clip']:
-                action = np.clip(action, -kwargs["clip"], kwargs["clip"])
-        except:
-            pass
-        return action
-
-        
+     
     def purePursuit(self):
         
         ###              Implement pure pursuit controller here               ###
@@ -219,6 +201,24 @@ class Controller():
         # print(f'xcurrent {myx:.2f} ycurrent {myy:.2f} targetx {target_x:.2f} targety {target_y:.2f} steering {steering_angle*180/pi:.2f}')
         return -steering_angle
     
+        def PID(self, kp, ki, kd, setpoint, feedback, **kwargs):
+            error = setpoint - feedback
+
+            # error_dot = (error - self.error_previous)/self.dt
+            error_integral = 0
+            error_integral += error*self.dt
+
+            self.error_previous = error
+
+            action = kp*error + ki*error_integral #+ kd*error_dot
+        
+            try:
+                if kwargs['clip']:
+                    action = np.clip(action, -kwargs["clip"], kwargs["clip"])
+            except:
+                pass
+            return action
+    
     def searchTargetPoint(self):
         ###           Search for target point in the given path               ###
         #       Take as an input the current state of the car & waypoints       #
@@ -228,7 +228,7 @@ class Controller():
         min_index = np.argmin(distances)
 
         # if (min_index + self.targetIndex) == len(self.path):
-        if distances[-1] < 0.5:
+        if distances[-1] < self.brakeMargin:
             self.brake = True
         else:
             self.brake = False
