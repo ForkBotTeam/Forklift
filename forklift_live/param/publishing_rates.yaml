@@ -1,0 +1,4 @@
+  middle_man_rate: 20
+  real_location_rate: 20
+  controller_rate: 50
+  wheel_encoder_rate: 20

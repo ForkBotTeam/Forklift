@@ -1,0 +1,103 @@
+<?xml version="1.0"?>
+<robot name="forklift" xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <xacro:arg name="laser_visual" default="false"/>
+  <xacro:arg name="camera_visual" default="false"/>
+  <xacro:arg name="imu_visual"   default="false"/>
+
+                           <!-- _________friction______________ -->
+  <gazebo reference="chassis">
+    <mu1>0.0</mu1>
+    <mu2>0.0</mu2>
+    <kp>1000000.0</kp>
+    <kd>100.0</kd>
+  </gazebo>   
+
+  <gazebo reference="left_wheel">
+    <mu1>0.5</mu1>
+    <mu2>0.5</mu2>
+    <kp>500000.0</kp>
+    <kd>2000.0</kd>
+  </gazebo>   
+
+  <gazebo reference="right_wheel">
+    <mu1>0.5</mu1>
+    <mu2>0.5</mu2>
+    <kp>500000.0</kp>
+    <kd>2000.0</kd>
+  </gazebo>
+
+  <gazebo reference="steering_wheel">
+    <mu1>2.5</mu1>
+    <mu2>1.2</mu2>
+    <kp>5000000.0</kp>
+    <kd>2000.0</kd>
+  </gazebo>      
+
+
+                     <!-- ______control__________ -->
+  <gazebo>
+    <plugin name="gazebo_ros_control" filename="libgazebo_ros_control.so">
+      <robotNamespace>/simulation</robotNamespace>
+      <robotParam>robot_description</robotParam>
+      <controlPeriod>0.002</controlPeriod>
+      <robotSimType>gazebo_ros_control/DefaultRobotHWSim</robotSimType>
+      <legacyModeNS>true</legacyModeNS>
+    </plugin>
+  </gazebo>
+  
+  <transmission name="left_wheel">
+    <type>"transmission_interface/SimpleTransmission"</type>
+    <joint name="left_wheel_joint">
+      <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="leftdriver">
+      <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+  
+  <transmission name="right_wheel">
+    <type>"transmission_interface/SimpleTransmission"</type>
+    <joint name="right_wheel_joint">
+      <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="rightdriver">
+      <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+  <transmission name="steering">
+    <type>"transmission_interface/SimpleTransmission"</type>
+    <joint name="steering_joint">
+      <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="steering_motor">
+      <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+  <transmission name="steering_wheel">
+    <type>"transmission_interface/SimpleTransmission"</type>
+    <joint name="steering_wheel_joint">
+      <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="steering_wheel">
+      <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+  
+  <transmission name="fork_transmission">
+    <type>"transmission_interface/SimpleTransmission"</type>
+    <joint name="fork_joint">
+        <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="fork_actuator">
+        <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+        <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission> 
+</robot>
