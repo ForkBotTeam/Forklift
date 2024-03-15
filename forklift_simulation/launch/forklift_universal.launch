@@ -1,0 +1,17 @@
+<launch>
+    <include file="$(find forklift_simulation)/launch/forklift_localiztion.launch" />
+    <include file="$(find forklift_simulation)/launch/forklift_control.launch" />
+    <include file="$(find forklift_simulation)/launch/forklift_simulation.launch" />
+    <include file="$(find forklift_simulation)/launch/forklift_sensors.launch" />
+    <include file="$(find forklift_simulation)/launch/ekf.launch" />
+
+    <node name="rviz" pkg="rviz" type="rviz"  args="-d $(find forklift_simulation)/config/forklift_pathplanning.rviz"/>
+    <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
+        <rosparam file="$(find forklift_simulation)/param/costmap_common_params.yaml" command="load" ns="global_costmap" />
+        <rosparam file="$(find forklift_simulation)/param/costmap_common_params.yaml" command="load" ns="local_costmap" />
+        <rosparam file="$(find forklift_simulation)/param/local_costmap_params.yaml" command="load" />
+        <rosparam file="$(find forklift_simulation)/param/global_costmap_params.yaml" command="load" />
+        <rosparam file="$(find forklift_simulation)/param/base_local_planner_params.yaml" command="load" />
+        <rosparam file="$(find forklift_simulation)/param/move_base_params.yaml" command="load" />
+      </node>
+</launch>

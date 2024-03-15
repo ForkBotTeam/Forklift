@@ -1,0 +1,45 @@
+<launch>
+    <!-- <node name="rviz" pkg="rviz" type="rviz" args="-d $(find forklift_simulation)/config/forklift_localization.rviz" /> -->
+    
+    <node name="map_loading" pkg="map_server" type="map_server" args="$(find forklift_simulation)/maps/mymap.yaml">
+        <param name="frame_id" value="map"/>  
+    </node>  
+
+                    <!-- _________________AMCL___________________-->
+    <node pkg="amcl" type="amcl" name="amcl">
+      <!-- Load map -->
+      <param name="use_sim_time" value="true"/>
+
+      <param name="use_map_topic" value="true"/>
+      <param name="odom_model_type" value="diff"/>
+  
+      <!-- Update frequencies -->
+      <param name="update_min_d" value="0.2"/>
+      <param name="update_min_a" value="0.1"/>
+  
+      <!-- Laser model parameters -->
+      <param name="laser_max_beams" value="30"/>
+      <param name="min_particles" value="500"/>
+      <param name="max_particles" value="2000"/>
+      <param name="kld_err" value="0.05"/>
+      <param name="kld_z" value="0.99"/>
+      <param name="odom_alpha1" value="0.2"/>
+      <param name="odom_alpha2" value="0.2"/>
+      <param name="odom_alpha3" value="0.2"/>
+      <param name="odom_alpha4" value="0.2"/>
+      <param name="odom_alpha5" value="0.2"/>
+  
+      <!-- Initial pose uncertainty -->
+      <param name="initial_pose_x" value="0.0"/>
+      <param name="initial_pose_y" value="0.0"/>
+      <param name="initial_pose_a" value="0.0"/>
+  
+      <!-- TF frames -->
+      <param name="base_frame_id" value="base_footprint"/>
+      <param name="global_frame_id" value="map"/>
+      <param name="map_frame_id" value="map"/>
+      <param name="odom_frame_id" value="odom"/>
+      <param name="global_frame_id" value="map"/>
+      <!-- Other parameters as needed -->
+    </node>
+</launch>
