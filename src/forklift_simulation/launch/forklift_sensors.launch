@@ -1,4 +1,0 @@
-<launch>
-    <node name="wheel_encoder" pkg="forklift_simulation" type="wheel_encoder.py" />
-
-</launch>
