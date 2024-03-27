@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from rospy import is_shutdown
+import rospy
 import cv2
 from pyzbar.pyzbar import decode
 import numpy as np
@@ -45,32 +45,43 @@ def get_video(): #function to get RGB image from kinect
     else:
         return Exception
     return array
-def get_depth(): #function to get depth image from kinect
-    d = freenect.sync_get_depth()
-    if d is not None:
-        array, _ = d
-        array = array.astype(np.uint8)
-    else:
-        return Exception
-    return array
-def how_far(depth, x, y): # "depth" are kinect depth frame, x,y are pixel locations
-    return np.round(depth[int(y), int(x)] + 65, 1) # cm
 
+def get_depth(): #function to get depth image from kinect
+    d = freenect.sync_get_depth(format = freenect.DEPTH_REGISTERED)
+
+    if d is not None:
+        depth_array, _ = d
+        cv2.medianBlur(depth_array, 5)
+        visualize_array = cv2.normalize(depth_array,dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
+        visualize_array = visualize_array.astype(np.uint8)
+    else:
+        print("failed...retrying")
+        return Exception
+    return depth_array, visualize_array
+
+def how_far(depth, x, y, **kwargs): # "depth" are kinect depth frame, x,y are pixel locations
+    # Remember x-axis translates to indexing of coloumns while y-axis is indexing of rows!
+    dist = str(depth[y,x]/1000)
+
+    if "print" in kwargs:
+        cv2.putText(kwargs["print"], dist,  (int(x+5),int(y+5)),fontFace= 3, fontScale= 0.75, color= (150,20,20),thickness= 2)    
+    return dist
 
 if __name__== "__main__":
     model=torch.hub.load('ultralytics/yolov5','yolov5s')
 
-    # cv2.moveWindow('Window',0,0)
-
+    rospy.init_node("beacon")
+    rate = rospy.Rate(10)
     k= 0
-    while k!=27 or is_shutdown(): # quit program when 'esc' key is pressed or terminal terminates
-        data_saved=[]
-        points_saved=[]
-        qr_centers=[]
+    data_saved=[]
+    points_saved=[]
+    qr_centers=[]
+    while k!=27 or rospy.is_shutdown(): # quit program when 'esc' key is pressed or terminal terminates
+
         k = cv2.waitKey(1) & 0xFF
 
         frame = get_video() #get a frame from RGB camera
-        depth = get_depth() #get a frame from depth sensor
+        quantitave_depth, visual_depth = get_depth() #get a frame from depth sensor
 
         codes = decode(frame)
         if len(codes)!=0:
@@ -101,16 +112,17 @@ if __name__== "__main__":
         
         # Print depth of objects and qr_codes on image
         for qr_center in qr_centers:
-            far = how_far(depth, qr_center[0], qr_center[1])
-            cv2.putText(frame, str(far),(int(qr_center[0]), int(qr_center[1])),fontFace= 2, fontScale= 0.75, color= (20,20,150),thickness= 1)
+            far = how_far(quantitave_depth, qr_center[0], qr_center[1])
+            cv2.putText(frame, far,(int(qr_center[0]), int(qr_center[1])),fontFace= 2, fontScale= 0.75, color= (20,20,150),thickness= 1)
 
         for yolo_center in yolo_centers:
-            far = how_far(depth, yolo_center[0][0], yolo_center[0][1])
+            far = how_far(quantitave_depth, yolo_center[0][0], yolo_center[0][1])
             # print(f"{yolo_center[0][0]}  {yolo_center[0][1]}")
-            cv2.putText(frame, str(far),(int(yolo_center[0][0]), int(yolo_center[0][1])),fontFace= 2, fontScale= 0.75, color= (20,20,150),thickness= 1)
+            cv2.putText(frame, far,(int(yolo_center[0][0]), int(yolo_center[0][1])),fontFace= 2, fontScale= 0.75, color= (20,20,150),thickness= 1)
 
             
         cv2.imshow('Window',np.squeeze(results.render()))
+        rate.sleep()
     
     freenect.sync_stop()
     cv2.destroyAllWindows()
