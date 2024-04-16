@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 import rospy
+from move_base_msgs.msg import MoveBaseActionGoal
+from std_msgs.msg import Int8
+
 import cv2
 from pyzbar.pyzbar import decode
 import numpy as np
 import os
 import uuid
+import math
+
 import torch
 import freenect
 
@@ -36,6 +41,49 @@ def QR_Draw_Bounds(frame,points_saved): # Draw the bounds of QR codes detected
         # cv2.putText(frame,(pts2[0],pts2[1]),cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,255),1)
     return frame
 
+def destination_decoder(codes):
+    codes = decode(frame)    
+    if codes != None:
+        msg = MoveBaseActionGoal()
+        for code in codes:
+            Data=code.data.decode('utf-8').split(',')
+            x = float(Data[0][2:])
+            y = float(Data[1][2:])
+            orientation = float(Data[2][2:])*np.pi/180
+            # Euler angles (in radians)
+            roll = 0
+            pitch = 0
+
+            # Calculate components
+            cos_roll = float(math.cos(roll / 2))
+            sin_roll = float(math.sin(roll / 2))
+            cos_pitch = float(math.cos(pitch / 2))
+            sin_pitch = float(math.sin(pitch / 2))
+            cos_yaw = float(math.cos(orientation / 2))
+            sin_yaw = float(math.sin(orientation / 2))
+
+            ww = float(cos_pitch * cos_yaw * cos_roll + sin_pitch * sin_yaw * sin_roll)
+            xx = float(cos_pitch * cos_yaw * sin_roll - sin_pitch * sin_yaw * cos_roll)
+            yy = float(cos_pitch * sin_yaw * cos_roll + sin_pitch * cos_yaw * sin_roll)
+            zz = float(sin_pitch * cos_yaw * cos_roll - cos_pitch * sin_yaw * sin_roll)
+            msg.goal.target_pose.header.frame_id="map"
+            msg.goal.target_pose.pose.position.x=x
+            msg.goal.target_pose.pose.position.y=y
+            msg.goal.target_pose.pose.orientation.z=yy
+            msg.goal.target_pose.pose.orientation.w=-ww
+
+            pts=np.array([code.polygon],np.int32)
+            pts.reshape((-1,1,2))
+
+            QR_Data(Data,data_saved) # Append new data and centroids of QR codes detected
+            qr_centers = QR_Centroid_Update(qr_centers, pts) # Update the centroids of QR codes detected
+
+            pts2=code.rect
+
+            points_saved.append((pts,pts2))
+
+            return msg
+
 # Kinect camera normal and depth frame retrievel 
 def get_video(): #function to get RGB image from kinect
     d = freenect.sync_get_video()
@@ -61,7 +109,7 @@ def get_depth(): #function to get depth image from kinect
 
 def how_far(depth, x, y, **kwargs): # "depth" are kinect depth frame, x,y are pixel locations
     # Remember x-axis translates to indexing of coloumns while y-axis is indexing of rows!
-    dist = str(depth[y,x]/1000)
+    dist = str(depth[int(y),int(x)]/1000)
 
     if "print" in kwargs:
         cv2.putText(kwargs["print"], dist,  (int(x+5),int(y+5)),fontFace= 3, fontScale= 0.75, color= (150,20,20),thickness= 2)    
@@ -71,45 +119,58 @@ if __name__== "__main__":
     model=torch.hub.load('ultralytics/yolov5','yolov5s')
 
     rospy.init_node("beacon")
-    rate = rospy.Rate(10)
+
+    qr_destination = rospy.Publisher('/destination',MoveBaseActionGoal, queue_size=10)
+    object_flag = rospy.Publisher('mish_faker', Int8, queue_size=10)
+
+
+    rate = rospy.Rate(1)
     k= 0
     data_saved=[]
     points_saved=[]
     qr_centers=[]
-    while k!=27 or rospy.is_shutdown(): # quit program when 'esc' key is pressed or terminal terminates
 
+    while k!=27 or rospy.is_shutdown(): # quit program when 'esc' key is pressed or terminal terminates
+        tic = rospy.get_time()
         k = cv2.waitKey(1) & 0xFF
 
+        # 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱
+        # GET FRAMES FROM CAMERA
+        #####################################
         frame = get_video() #get a frame from RGB camera
         quantitave_depth, visual_depth = get_depth() #get a frame from depth sensor
+        ####################################
 
-        codes = decode(frame)
-        if len(codes)!=0:
-            for code in codes:
-                cframe=frame.copy()
-                Data=code.data.decode('utf-8')
 
-                pts=np.array([code.polygon],np.int32)
-                pts.reshape((-1,1,2))
-
-                QR_Data(Data,data_saved) # Append new data and centroids of QR codes detected
-                qr_centers = QR_Centroid_Update(qr_centers, pts) # Update the centroids of QR codes detected
-                cv2.polylines(cframe,[pts],True,(255,0,255),5)
-                pts2=code.rect
-
-                points_saved.append((pts,pts2))
-
-                cv2.putText(cframe,Data,(pts2[0],pts2[1]),cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,255),1)
-        
-        # print(f'QR Centroids : {qr_centers}') # This list contains the centroids of QR codes detected <-- This is what you need "QRs detected from before are not deleted"
+        # 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱
+        # QR-CODE MANEGMENT
+        ####################################
+        dest = destination_decoder(frame)
+        if dest != None:
+            qr_destination.publish(dest)
         frame = QR_Draw_Bounds(frame,points_saved) # Draw the bounds of QR codes detected
+        ####################################
 
-        results = model(frame)
-        cake = results.xyxy[0][:, :-1].cpu().numpy()
-        yolo_centers = YOLO_Centroid(cake)
-
-        # print(f'YOLO centroids : {yolo_obj}') # This list contains the centroids and confidence of objects detected by yolo  <--- This is what you need "Objects detected from before are deleted if not detected"
         
+        # 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱 🂱
+        # OBJECT DETECTION AND MANEGMENT
+        ####################################
+        results = model(frame)
+
+        cake = results.xyxy[0][:, :-1].cpu().numpy()
+        detected_names = np.array(results.pandas().xyxy[0]['name'])
+        
+        target_object = "person"
+        indices = np.where(detected_names == target_object)
+
+        # print(f"{detected_names[indices]} \n {cake[indices,:]} \n +++++++++")
+        
+        if indices != None:
+            object_flag.publish(ord("S"))
+        yolo_centers = YOLO_Centroid(cake)
+        ####################################
+
+
         # Print depth of objects and qr_codes on image
         for qr_center in qr_centers:
             far = how_far(quantitave_depth, qr_center[0], qr_center[1])
@@ -122,17 +183,11 @@ if __name__== "__main__":
 
             
         cv2.imshow('Window',np.squeeze(results.render()))
+        tictoc = rospy.get_time() - tic
+        print(tictoc)
         rate.sleep()
     
     freenect.sync_stop()
     cv2.destroyAllWindows()
 
-
-
-
-
-
-
-
-
-
+    
