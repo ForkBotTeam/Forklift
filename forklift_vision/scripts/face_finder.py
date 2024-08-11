@@ -12,58 +12,54 @@ class corner_finder():
         rate = rospy.Rate(10)
 
         # Array initiation for faster operation
-        self.frame = np.empty([480,640,3])
-        self.quantitative_depth = np.empty([480,640,3])
-        self.visual_depth = np.empty([480,640,3])
-        self.frame_original = np.empty([480,640,3])
+        self.frame = np.empty([480,640,3], dtype= np.uint8)
+        self.quantitative_depth = np.empty([480,640,3], dtype= np.uint16)
+        self.visual_depth = np.empty([480,640,3], dtype= np.uint8)
+        self.frame_original = np.empty([480,640,3], dtype= np.uint8)
 
         # Fake YOLO, create a slice aimed at the box
         posx = slice(170,400)
         posy = slice(214,390)
+
         self.rangex = posx.stop - posx.start
         self.rangey = posy.stop - posy.start
         SCx = int((posx.stop+posx.start)/2) #slice_centerx
         SCy = int((posy.stop+posy.start)/2) #slice_centery
-        refx = slice((SCx-10),(SCx+10))
-        refy = slice((SCy-10),(SCy+10))
+        refx = slice((SCx-15),(SCx+15))
+        refy = slice((SCy-15),(SCy+15))
 
         # A Valley-shaped array used as a range of weights to properly isolate an object
-        decreasing_array = np.arange((posy.stop-posy.start+6)/2, 3, -1)
-        both_halves = np.hstack([decreasing_array, decreasing_array[::-1]])
+        decreasing_array = np.arange((posy.stop-posy.start+6)/2, 3, -1, dtype= np.uint16)
+        both_halves = np.hstack([decreasing_array, decreasing_array[::-1]], dtype= np.uint16)
         self.valley = np.tile(both_halves, (posx.stop-posx.start, 1))
 
+        # Others
+        self.renew = 0
+        self.prev_lines = 0
+
         self.box_lines = None
-        self.edges = 0
         tictoc = rospy.get_time()
         while 1:
+            #>>> Visual depth: normalized for displaying. 
+            #>>> Quantitative depth: has correct distacne values in mm 
             self.frame = self.get_video() #get a frame from RGB camera
             self.frame_original = np.copy(self.frame)
             self.quantitative_depth, self.visual_depth = self.get_depth() 
-            
-            #>>> Visual depth: normalized for displaying. 
-            #>>> Quantitative depth: has correct distacne values in mm 
 
 
             center_distance = np.mean(self.quantitative_depth[refx,refy])
-
             mask = self.isolate(self.quantitative_depth[posx, posy], center_distance)
-            gray = cv2.cvtColor(self.frame_original[posx, posy],cv2.COLOR_BGR2GRAY)
-            self.display(gray*mask, "isolated", 3)
-
             self.detect_edge(self.frame_original[posx,posy], mask, posx.start, posy.start) 
             real_lines = None
-            # try:
+
             if self.box_lines is not None:
                 x1, y1, z1 = self.real_coordinates(self.box_lines[:,0:1], self.box_lines[:,1:2], 640, 480)
                 x2, y2, z2 = self.real_coordinates(self.box_lines[:,2:3], self.box_lines[:,3:4], 640, 480)
 
                 real_lines = np.hstack([x1,y1,z1,x2,y2,z2])
 
-            # except:
-            #     pass
             self.face_finder(real_lines)
-       
-            
+
 
             self.display(self.frame_original[posx,posy], "original", 0)
             self.display(self.frame, "cornered", 1)
@@ -73,9 +69,10 @@ class corner_finder():
             if k == 27:
                 # cv2.imwrite('Documents/fork/src/forklift_vision/images/depth_pic.jpg', self.visual_depth)
                 break
-            # print(rospy.get_time()-tictoc)
-            tictoc = rospy.get_time()
+            print(rospy.get_time()-tictoc)
             rate.sleep()
+            tictoc = rospy.get_time()
+
 
         freenect.sync_stop()
         cv2.destroyAllWindows()
@@ -146,11 +143,12 @@ class corner_finder():
     def detect_edge(self, target, mask, xbound, ybound):
         #$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
         # EDGE DETECTION USING HOUGH-TRANSFORM METHOD  
+        target *= mask
         gray = cv2.cvtColor(target, cv2.COLOR_BGR2GRAY) 
         gray = cv2.medianBlur(gray, 5)
 
-        gray *= mask
-        gray = np.uint8(gray)
+        # gray *= mask
+        # gray = np.uint8(gray)
 
         self.display(gray,"blurred", 4)
 
@@ -158,35 +156,39 @@ class corner_finder():
 
         self.display(edges, "canny",5)  
 
-        voting = int(np.min([self.rangex, self.rangey])/2)-20  # no of voting points = min edge of the bounding box - a margin      
-        lines = cv2.HoughLinesP(edges, 5, 5*np.pi/180, 10, None, 10, 50)
-        cv2.imwrite('Documents/fork/src/forklift_vision/images/depth_pic.jpg', self.visual_depth)
+#########################################################
 
+        voting = int(np.min([self.rangex, self.rangey])/2)-20  # no of voting points = min edge of the bounding box - a margin         
+        lines = cv2.HoughLinesP(edges, 1, np.pi/180, voting, None, voting, 20)
         
-        try:
-            # The below for loop runs till r and theta values are in the range of the 2d array
+        lsd = cv2.createLineSegmentDetector(0)
+        lsd_lines = lsd.detect(gray)[0][:,0] + np.array([ybound, xbound, ybound, xbound], dtype=np.float32)
+        
+        tst_img2 = np.copy(self.frame)
+        tst_img2 = lsd.drawSegments(tst_img2, lsd_lines)
+        self.display(tst_img2, "lsd", 3)
+
+        if lines is not None:        
             self.box_lines = lines[:,0] + np.array([ybound, xbound, ybound, xbound])
+            # print(lines)
+            # The below for loop runs till r and theta values are in the range of the 2d array
             for i in range(0, len(lines)):
                 # l = lines[i][0]
                 cv2.line(self.frame, (self.box_lines[i,0], self.box_lines[i,1]), (self.box_lines[i,2], self.box_lines[i,3]), (0, 0, 255), 2, cv2.LINE_AA)
-        except :
-            # print("There are no lines BRO!")
-            pass
+
 
     def isolate(self, depth, ref):
         # margin = 500
-        # depth = depth.transpose()
-        # img = np.array([(depth < ref+margin) & (depth > ref-margin)]*3).transpose() * img
+        # condition = (depth < ref+margin) & (depth > ref-margin)
+        # mask = np.ones(depth.shape, dtype=np.uint8)*condition
 
-        # img = ((depth < ref+margin) & (depth > ref-margin)) 
-        # mask = np.ones(img.shape, dtype=np.uint8)
-        # mask = img*mask
         pos_ref = ref + self.valley*8
         neg_ref = ref - self.valley*8
         condition = ((depth < pos_ref) & (depth > neg_ref))
         mask = np.ones(depth.shape, dtype=np.uint8)*condition
         smoother = int(np.max([self.rangex, self.rangey])/45)*2 + 3
         mask = cv2.medianBlur(mask, smoother)
+        mask = np.array([mask.transpose()]*3).transpose()
         
         return mask
 

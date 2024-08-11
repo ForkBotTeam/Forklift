@@ -2,7 +2,10 @@
     <!-- <node name="rviz" pkg="rviz" type="rviz" args="-d $(find forklift_simulation)/config/forklift_localization.rviz" /> -->
     
     <node name="map_loading" pkg="map_server" type="map_server" args="$(find forklift_simulation)/maps/mymap.yaml">
-        <param name="frame_id" value="map"/>  
+        <param name="frame_id" value="map"/> 
+        <param name="map_server_rate" value="1.0"/>  
+ 
+
     </node>  
 
                     <!-- _________________AMCL___________________-->
@@ -11,18 +14,12 @@
       <param name="use_sim_time" value="true"/>
 
       <param name="use_map_topic" value="true"/>
-      <param name="odom_model_type" value="diff"/>
   
       <!-- Update frequencies -->
-      <param name="update_min_d" value="0.2"/>
-      <param name="update_min_a" value="0.1"/>
+      <param name="update_min_d" value="0.001"/>
+      <param name="update_min_a" value="0.001"/>
   
       <!-- Laser model parameters -->
-      <param name="laser_max_beams" value="30"/>
-      <param name="min_particles" value="500"/>
-      <param name="max_particles" value="2000"/>
-      <param name="kld_err" value="0.05"/>
-      <param name="kld_z" value="0.99"/>
       <param name="odom_alpha1" value="0.2"/>
       <param name="odom_alpha2" value="0.2"/>
       <param name="odom_alpha3" value="0.2"/>
